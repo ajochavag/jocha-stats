@@ -1,9 +1,36 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Calendar, Users, ArrowLeft, Trophy } from 'lucide-react'
-import { getTournamentBySlug, tournaments } from '@/lib/data'
+import type { Tournament } from '@/lib/data'
 
-export function generateStaticParams() {
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
+async function getTournament(slug: string): Promise<Tournament | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/tournaments/${slug}`, {
+      cache: 'no-store',
+    })
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
+  }
+}
+
+async function getAllTournaments(): Promise<Tournament[]> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/tournaments`, {
+      cache: 'no-store',
+    })
+    if (!res.ok) return []
+    return res.json()
+  } catch {
+    return []
+  }
+}
+
+export async function generateStaticParams() {
+  const tournaments = await getAllTournaments()
   return tournaments.map((tournament) => ({
     slug: tournament.slug,
   }))
@@ -33,7 +60,7 @@ function getPlacementLabel(placement: number) {
 
 export default async function TournamentDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const tournament = getTournamentBySlug(slug)
+  const tournament = await getTournament(slug)
 
   if (!tournament) {
     notFound()

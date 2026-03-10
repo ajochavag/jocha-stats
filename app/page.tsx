@@ -2,13 +2,58 @@ import Link from 'next/link'
 import { ArrowRight, Trophy, Users, Gamepad2, Crown } from 'lucide-react'
 import { AnimatedCounter } from '@/components/animated-counter'
 import { TournamentCard } from '@/components/tournament-card'
-import { tournaments, players, getRecentTournaments, getLastChampion, getRankings } from '@/lib/data'
+import type { Tournament, Player } from '@/lib/data'
 
-export default function HomePage() {
-  const recentTournaments = getRecentTournaments(3)
-  const lastChampion = getLastChampion()
-  const topPlayers = getRankings().slice(0, 5)
-  const totalSets = tournaments.reduce((acc, t) => acc + t.sets.length, 0)
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
+async function getTournaments(): Promise<Tournament[]> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/tournaments`, {
+      cache: 'no-store',
+    })
+    if (!res.ok) return []
+    return res.json()
+  } catch {
+    return []
+  }
+}
+
+async function getRankingsData(): Promise<Player[]> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/rankings?filter=all`, {
+      cache: 'no-store',
+    })
+    if (!res.ok) return []
+    return res.json()
+  } catch {
+    return []
+  }
+}
+
+async function getPlayersData(): Promise<Player[]> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/players`, {
+      cache: 'no-store',
+    })
+    if (!res.ok) return []
+    return res.json()
+  } catch {
+    return []
+  }
+}
+
+export default async function HomePage() {
+  const [tournaments, rankings, players] = await Promise.all([
+    getTournaments(),
+    getRankingsData(),
+    getPlayersData(),
+  ])
+
+  const recentTournaments = [...tournaments].reverse().slice(0, 3)
+  const lastTournament = tournaments[tournaments.length - 1]
+  const lastChampion = lastTournament?.results?.find((r) => r.placement === 1)?.playerTag || ''
+  const topPlayers = rankings.slice(0, 5)
+  const totalSets = tournaments.reduce((acc, t) => acc + (t.sets?.length || 0), 0)
 
   return (
     <div className="animate-in fade-in duration-500">

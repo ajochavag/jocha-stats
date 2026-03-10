@@ -1,28 +1,36 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Search, ArrowUpDown } from 'lucide-react'
-import { players } from '@/lib/data'
 import { PlayerCard } from '@/components/player-card'
+import type { Player } from '@/lib/data'
 
 type SortOption = 'name' | 'winRate' | 'tournaments' | 'points'
 
 export default function JugadoresPage() {
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<SortOption>('points')
+  const [players, setPlayers] = useState<Player[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/players')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setPlayers(data))
+      .catch(() => setPlayers([]))
+      .finally(() => setLoading(false))
+  }, [])
 
   const filteredAndSortedPlayers = useMemo(() => {
     let result = [...players]
 
-    // Filter by search
     if (search) {
-      result = result.filter(p => 
+      result = result.filter(p =>
         p.tag.toLowerCase().includes(search.toLowerCase()) ||
         p.main.toLowerCase().includes(search.toLowerCase())
       )
     }
 
-    // Sort
     switch (sortBy) {
       case 'name':
         result.sort((a, b) => a.tag.localeCompare(b.tag))
@@ -39,7 +47,7 @@ export default function JugadoresPage() {
     }
 
     return result
-  }, [search, sortBy])
+  }, [players, search, sortBy])
 
   return (
     <div className="container mx-auto px-4 py-12 animate-in fade-in duration-500">
@@ -78,17 +86,31 @@ export default function JugadoresPage() {
         </div>
       </div>
 
-      {/* Players Grid */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredAndSortedPlayers.map((player) => (
-          <PlayerCard key={player.slug} player={player} />
-        ))}
-      </div>
-
-      {filteredAndSortedPlayers.length === 0 && (
-        <div className="text-center py-16">
-          <p className="text-zinc-500">No se encontraron jugadores con ese criterio.</p>
+      {loading ? (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-pulse">
+              <div className="h-6 bg-zinc-800 rounded w-2/3 mb-4" />
+              <div className="h-4 bg-zinc-800 rounded w-1/2 mb-2" />
+              <div className="h-4 bg-zinc-800 rounded w-1/3" />
+            </div>
+          ))}
         </div>
+      ) : (
+        <>
+          {/* Players Grid */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredAndSortedPlayers.map((player) => (
+              <PlayerCard key={player.slug} player={player} />
+            ))}
+          </div>
+
+          {filteredAndSortedPlayers.length === 0 && (
+            <div className="text-center py-16">
+              <p className="text-zinc-500">No se encontraron jugadores con ese criterio.</p>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

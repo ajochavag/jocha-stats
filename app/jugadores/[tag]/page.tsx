@@ -1,11 +1,11 @@
 'use client'
 
-import { use, useState, useMemo } from 'react'
+import { use, useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, Trophy, Target, TrendingUp, Zap, ArrowUpDown } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { getPlayerBySlug, getPlayerTournamentHistory, getPlayerHeadToHead, players } from '@/lib/data'
+import type { Player, Tournament, TournamentResult, HeadToHead } from '@/lib/data'
 
 function getPlacementColor(placement: number) {
   switch (placement) {
@@ -22,40 +22,71 @@ function getPlacementColor(placement: number) {
 
 type H2HSortOption = 'winRate' | 'wins' | 'recent'
 
+interface PlayerApiResponse {
+  player: Player
+  rank: number
+  tournamentHistory: { tournament: Tournament; result: TournamentResult }[]
+  headToHead: HeadToHead[]
+}
+
 export default function PlayerProfilePage({ params }: { params: Promise<{ tag: string }> }) {
   const { tag } = use(params)
-  const player = getPlayerBySlug(tag)
   const [h2hSort, setH2hSort] = useState<H2HSortOption>('winRate')
+  const [data, setData] = useState<PlayerApiResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
-  if (!player) {
+  useEffect(() => {
+    fetch(`/api/players/${tag}`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Not found')
+        return res.json()
+      })
+      .then((d) => setData(d))
+      .catch(() => setError(true))
+      .finally(() => setLoading(false))
+  }, [tag])
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-12 animate-in fade-in duration-500">
+        <div className="animate-pulse">
+          <div className="h-8 bg-zinc-800 rounded w-32 mb-8" />
+          <div className="h-48 bg-zinc-900 border border-zinc-800 rounded-2xl mb-12" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-28 bg-zinc-900 border border-zinc-800 rounded-xl" />
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !data) {
     notFound()
   }
 
-  const tournamentHistory = getPlayerTournamentHistory(player.tag)
-  const headToHead = getPlayerHeadToHead(player.tag)
+  const { player, rank, tournamentHistory, headToHead } = data
 
-  const sortedH2H = useMemo(() => {
-    const sorted = [...headToHead]
+  const sortedH2H = [...headToHead].sort((a, b) => {
     switch (h2hSort) {
       case 'winRate':
-        sorted.sort((a, b) => b.winRate - a.winRate)
-        break
+        return b.winRate - a.winRate
       case 'wins':
-        sorted.sort((a, b) => b.wins - a.wins)
-        break
+        return b.wins - a.wins
       case 'recent':
-        sorted.sort((a, b) => new Date(b.lastPlayed).getTime() - new Date(a.lastPlayed).getTime())
-        break
+        return new Date(b.lastPlayed).getTime() - new Date(a.lastPlayed).getTime()
+      default:
+        return 0
     }
-    return sorted
-  }, [headToHead, h2hSort])
+  })
 
-  // Chart data - placement progress (inverted so 1st is at top)
   const chartData = tournamentHistory.map(({ tournament, result }) => ({
     name: `#${tournament.id}`,
     tournament: tournament.name,
     placement: result.placement,
-    invertedPlacement: 13 - result.placement, // Invert so 1st (1) becomes 12, showing at top
+    invertedPlacement: 13 - result.placement,
   }))
 
   return (
@@ -74,7 +105,7 @@ export default function PlayerProfilePage({ params }: { params: Promise<{ tag: s
         {/* Background gradient */}
         <div className="absolute inset-0 bg-gradient-to-r from-[#CC1F1F]/30 via-zinc-900 to-[#1E6FCC]/30" />
         <div className="absolute inset-0 bg-zinc-900/80" />
-        
+
         {/* Glow effects */}
         <div className="absolute -left-20 top-1/2 -translate-y-1/2 w-64 h-64 bg-[#CC1F1F]/20 rounded-full blur-[100px]" />
         <div className="absolute -right-20 top-1/2 -translate-y-1/2 w-64 h-64 bg-[#1E6FCC]/20 rounded-full blur-[100px]" />
@@ -90,7 +121,7 @@ export default function PlayerProfilePage({ params }: { params: Promise<{ tag: s
             <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
               <span className="text-zinc-400">Ranking:</span>
               <span className="text-2xl font-bold text-white">
-                #{players.findIndex(p => p.slug === player.slug) + 1}
+                #{rank}
               </span>
             </div>
           </div>
@@ -122,24 +153,26 @@ export default function PlayerProfilePage({ params }: { params: Promise<{ tag: s
       </div>
 
       {/* Mains Section */}
-      <section className="mb-12">
-        <h2 className="font-[var(--font-bebas-neue)] text-2xl text-white tracking-wide mb-6">
-          Mains
-        </h2>
-        <div className="flex flex-wrap gap-3">
-          {player.characterStats.map((char) => (
-            <div
-              key={char.character}
-              className="flex items-center gap-3 px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-xl"
-            >
-              <span className="text-white font-medium">{char.character}</span>
-              <div className="h-4 w-px bg-zinc-700" />
-              <span className="text-sm text-zinc-400">{char.winRate}% WR</span>
-              <span className="text-xs text-zinc-600">({char.setsPlayed} sets)</span>
-            </div>
-          ))}
-        </div>
-      </section>
+      {player.characterStats && player.characterStats.length > 0 && (
+        <section className="mb-12">
+          <h2 className="font-[var(--font-bebas-neue)] text-2xl text-white tracking-wide mb-6">
+            Mains
+          </h2>
+          <div className="flex flex-wrap gap-3">
+            {player.characterStats.map((char) => (
+              <div
+                key={char.character}
+                className="flex items-center gap-3 px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-xl"
+              >
+                <span className="text-white font-medium">{char.character}</span>
+                <div className="h-4 w-px bg-zinc-700" />
+                <span className="text-sm text-zinc-400">{char.winRate}% WR</span>
+                <span className="text-xs text-zinc-600">({char.setsPlayed} sets)</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Tournament History */}
       <section className="mb-12">
@@ -159,7 +192,7 @@ export default function PlayerProfilePage({ params }: { params: Promise<{ tag: s
                 </tr>
               </thead>
               <tbody>
-                {tournamentHistory.reverse().map(({ tournament, result }) => (
+                {[...tournamentHistory].reverse().map(({ tournament, result }) => (
                   <tr
                     key={tournament.id}
                     className="border-b border-zinc-800 last:border-0 hover:bg-zinc-800/50 transition-colors group hover:border-l-2 hover:border-l-[#CC1F1F]"
@@ -198,12 +231,12 @@ export default function PlayerProfilePage({ params }: { params: Promise<{ tag: s
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                <XAxis 
-                  dataKey="name" 
+                <XAxis
+                  dataKey="name"
                   stroke="#71717a"
                   fontSize={12}
                 />
-                <YAxis 
+                <YAxis
                   stroke="#71717a"
                   fontSize={12}
                   domain={[0, 12]}
@@ -236,10 +269,10 @@ export default function PlayerProfilePage({ params }: { params: Promise<{ tag: s
                     return label
                   }}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="invertedPlacement" 
-                  stroke="#CC1F1F" 
+                <Line
+                  type="monotone"
+                  dataKey="invertedPlacement"
+                  stroke="#CC1F1F"
                   strokeWidth={3}
                   dot={{ fill: '#CC1F1F', strokeWidth: 2, r: 5 }}
                   activeDot={{ r: 8, fill: '#CC1F1F' }}
@@ -282,43 +315,40 @@ export default function PlayerProfilePage({ params }: { params: Promise<{ tag: s
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedH2H.map((h2h) => {
-                    const opponentPlayer = players.find(p => p.tag === h2h.opponent)
-                    return (
-                      <tr
-                        key={h2h.opponent}
-                        className="border-b border-zinc-800 last:border-0 hover:bg-zinc-800/50 transition-colors group hover:border-l-2 hover:border-l-[#CC1F1F]"
-                      >
-                        <td className="px-4 py-4">
-                          <Link
-                            href={`/jugadores/${opponentPlayer?.slug || h2h.opponent.toLowerCase().replace(/\s+/g, '-')}`}
-                            className="text-white font-medium hover:text-[#CC1F1F] transition-colors"
-                          >
-                            {h2h.opponent}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-4">
-                          <span className="text-green-500">{h2h.wins}</span>
-                          <span className="text-zinc-600 mx-1">-</span>
-                          <span className="text-red-500">{h2h.losses}</span>
-                        </td>
-                        <td className="px-4 py-4">
-                          <span className={`font-semibold ${
-                            h2h.winRate >= 50 ? 'text-green-500' : 'text-red-500'
-                          }`}>
-                            {h2h.winRate}%
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 hidden md:table-cell text-zinc-500">
-                          {new Date(h2h.lastPlayed).toLocaleDateString('es-ES', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric'
-                          })}
-                        </td>
-                      </tr>
-                    )
-                  })}
+                  {sortedH2H.map((h2h) => (
+                    <tr
+                      key={h2h.opponent}
+                      className="border-b border-zinc-800 last:border-0 hover:bg-zinc-800/50 transition-colors group hover:border-l-2 hover:border-l-[#CC1F1F]"
+                    >
+                      <td className="px-4 py-4">
+                        <Link
+                          href={`/jugadores/${h2h.opponent.toLowerCase().replace(/\s+/g, '-')}`}
+                          className="text-white font-medium hover:text-[#CC1F1F] transition-colors"
+                        >
+                          {h2h.opponent}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className="text-green-500">{h2h.wins}</span>
+                        <span className="text-zinc-600 mx-1">-</span>
+                        <span className="text-red-500">{h2h.losses}</span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={`font-semibold ${
+                          h2h.winRate >= 50 ? 'text-green-500' : 'text-red-500'
+                        }`}>
+                          {h2h.winRate}%
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 hidden md:table-cell text-zinc-500">
+                        {h2h.lastPlayed ? new Date(h2h.lastPlayed).toLocaleDateString('es-ES', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric'
+                        }) : '-'}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

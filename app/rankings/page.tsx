@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { getRankings, type Player } from '@/lib/data'
+import type { Player } from '@/lib/data'
 
 type FilterOption = 'all' | 'last5' | 'last3'
 
@@ -43,9 +43,16 @@ function getPlacementLabel(placement: number) {
 
 export default function RankingsPage() {
   const [filter, setFilter] = useState<FilterOption>('all')
+  const [rankings, setRankings] = useState<Player[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const rankings = useMemo(() => {
-    return getRankings(filter)
+  useEffect(() => {
+    setLoading(true)
+    fetch(`/api/rankings?filter=${filter}`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setRankings(data))
+      .catch(() => setRankings([]))
+      .finally(() => setLoading(false))
   }, [filter])
 
   return (
@@ -107,64 +114,78 @@ export default function RankingsPage() {
               </tr>
             </thead>
             <tbody>
-              {rankings.map((player, index) => {
-                const rank = index + 1
-                return (
-                  <tr
-                    key={player.slug}
-                    className={`border-b border-zinc-800 last:border-0 hover:bg-zinc-800/50 transition-colors group hover:border-l-2 hover:border-l-[#CC1F1F] ${getPlacementColor(rank)}`}
-                  >
-                    <td className="px-4 py-5">
-                      <span className={`text-lg font-bold ${getRankColor(rank)}`}>
-                        #{rank}
-                      </span>
-                    </td>
-                    <td className="px-4 py-5">
-                      <Link
-                        href={`/jugadores/${player.slug}`}
-                        className="flex items-center gap-3"
-                      >
-                        <div>
-                          <span className="text-white font-semibold hover:text-[#CC1F1F] transition-colors block">
-                            {player.tag}
-                          </span>
-                          <span className="text-xs text-zinc-500">{player.main}</span>
-                        </div>
-                      </Link>
-                    </td>
-                    <td className="px-4 py-5">
-                      <span className="text-white font-bold text-lg">{player.totalPoints}</span>
-                    </td>
-                    <td className="px-4 py-5 hidden sm:table-cell text-zinc-400">
-                      {player.tournamentsAttended}
-                    </td>
-                    <td className="px-4 py-5 hidden md:table-cell">
-                      <span className={`inline-flex items-center justify-center px-2 py-1 rounded text-sm font-medium ${
-                        player.bestPlacement === 1 ? 'bg-[#FFD700]/10 text-[#FFD700]' :
-                        player.bestPlacement === 2 ? 'bg-[#C0C0C0]/10 text-[#C0C0C0]' :
-                        player.bestPlacement === 3 ? 'bg-[#CD7F32]/10 text-[#CD7F32]' :
-                        'bg-zinc-800 text-zinc-400'
-                      }`}>
-                        {getPlacementLabel(player.bestPlacement)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-5 hidden lg:table-cell">
-                      <span className={`font-medium ${
-                        player.winRate >= 70 ? 'text-green-500' :
-                        player.winRate >= 50 ? 'text-yellow-500' :
-                        'text-red-500'
-                      }`}>
-                        {player.winRate}%
-                      </span>
-                    </td>
-                    <td className="px-4 py-5 hidden lg:table-cell text-zinc-400">
-                      <span className="text-green-500">{player.setsWon}</span>
-                      <span className="text-zinc-600 mx-1">-</span>
-                      <span className="text-red-500">{player.setsLost}</span>
-                    </td>
+              {loading ? (
+                Array.from({ length: 8 }).map((_, i) => (
+                  <tr key={i} className="border-b border-zinc-800 animate-pulse">
+                    <td className="px-4 py-5"><div className="h-5 bg-zinc-800 rounded w-8" /></td>
+                    <td className="px-4 py-5"><div className="h-5 bg-zinc-800 rounded w-24" /></td>
+                    <td className="px-4 py-5"><div className="h-5 bg-zinc-800 rounded w-12" /></td>
+                    <td className="px-4 py-5 hidden sm:table-cell"><div className="h-5 bg-zinc-800 rounded w-8" /></td>
+                    <td className="px-4 py-5 hidden md:table-cell"><div className="h-5 bg-zinc-800 rounded w-10" /></td>
+                    <td className="px-4 py-5 hidden lg:table-cell"><div className="h-5 bg-zinc-800 rounded w-12" /></td>
+                    <td className="px-4 py-5 hidden lg:table-cell"><div className="h-5 bg-zinc-800 rounded w-14" /></td>
                   </tr>
-                )
-              })}
+                ))
+              ) : (
+                rankings.map((player, index) => {
+                  const rank = index + 1
+                  return (
+                    <tr
+                      key={player.slug}
+                      className={`border-b border-zinc-800 last:border-0 hover:bg-zinc-800/50 transition-colors group hover:border-l-2 hover:border-l-[#CC1F1F] ${getPlacementColor(rank)}`}
+                    >
+                      <td className="px-4 py-5">
+                        <span className={`text-lg font-bold ${getRankColor(rank)}`}>
+                          #{rank}
+                        </span>
+                      </td>
+                      <td className="px-4 py-5">
+                        <Link
+                          href={`/jugadores/${player.slug}`}
+                          className="flex items-center gap-3"
+                        >
+                          <div>
+                            <span className="text-white font-semibold hover:text-[#CC1F1F] transition-colors block">
+                              {player.tag}
+                            </span>
+                            <span className="text-xs text-zinc-500">{player.main}</span>
+                          </div>
+                        </Link>
+                      </td>
+                      <td className="px-4 py-5">
+                        <span className="text-white font-bold text-lg">{player.totalPoints}</span>
+                      </td>
+                      <td className="px-4 py-5 hidden sm:table-cell text-zinc-400">
+                        {player.tournamentsAttended}
+                      </td>
+                      <td className="px-4 py-5 hidden md:table-cell">
+                        <span className={`inline-flex items-center justify-center px-2 py-1 rounded text-sm font-medium ${
+                          player.bestPlacement === 1 ? 'bg-[#FFD700]/10 text-[#FFD700]' :
+                          player.bestPlacement === 2 ? 'bg-[#C0C0C0]/10 text-[#C0C0C0]' :
+                          player.bestPlacement === 3 ? 'bg-[#CD7F32]/10 text-[#CD7F32]' :
+                          'bg-zinc-800 text-zinc-400'
+                        }`}>
+                          {getPlacementLabel(player.bestPlacement)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-5 hidden lg:table-cell">
+                        <span className={`font-medium ${
+                          player.winRate >= 70 ? 'text-green-500' :
+                          player.winRate >= 50 ? 'text-yellow-500' :
+                          'text-red-500'
+                        }`}>
+                          {player.winRate}%
+                        </span>
+                      </td>
+                      <td className="px-4 py-5 hidden lg:table-cell text-zinc-400">
+                        <span className="text-green-500">{player.setsWon}</span>
+                        <span className="text-zinc-600 mx-1">-</span>
+                        <span className="text-red-500">{player.setsLost}</span>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
             </tbody>
           </table>
         </div>
