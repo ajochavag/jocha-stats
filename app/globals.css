@@ -1,0 +1,81 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* Smash Bong Summit - Dark Esports Theme */
+:root {
+  --background: #0A0A0F;
+  --foreground: #C8C8C8;
+  --card: #18181b;
+  --card-foreground: #C8C8C8;
+  --popover: #18181b;
+  --popover-foreground: #C8C8C8;
+  --primary: #CC1F1F;
+  --primary-foreground: #FFFFFF;
+  --secondary: #1E6FCC;
+  --secondary-foreground: #FFFFFF;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --accent: #27272a;
+  --accent-foreground: #FFFFFF;
+  --destructive: #CC1F1F;
+  --destructive-foreground: #FFFFFF;
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #CC1F1F;
+  --chart-1: #CC1F1F;
+  --chart-2: #1E6FCC;
+  --chart-3: #27272a;
+  --chart-4: #FFD700;
+  --chart-5: #C0C0C0;
+  --radius: 0.75rem;
+  --gold: #FFD700;
+  --silver: #C0C0C0;
+  --bronze: #CD7F32;
+}
+
+@theme inline {
+  --font-sans: var(--font-inter);
+  --font-heading: var(--font-bebas-neue);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-gold: var(--gold);
+  --color-silver: var(--silver);
+  --color-bronze: var(--bronze);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
