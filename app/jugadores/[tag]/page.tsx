@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, Trophy, Target, TrendingUp, Zap, ArrowUpDown } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import type { Player, Tournament, TournamentResult, HeadToHead } from '@/lib/data'
+import { CharacterIcon } from '@/components/CharacterIcon'
 
 function getPlacementColor(placement: number) {
   switch (placement) {
@@ -152,27 +153,30 @@ export default function PlayerProfilePage({ params }: { params: Promise<{ tag: s
         </div>
       </div>
 
-      {/* Mains Section */}
-      {player.characterStats && player.characterStats.length > 0 && (
-        <section className="mb-12">
-          <h2 className="font-[var(--font-bebas-neue)] text-2xl text-white tracking-wide mb-6">
-            Mains
-          </h2>
-          <div className="flex flex-wrap gap-3">
-            {player.characterStats.map((char) => (
-              <div
-                key={char.character}
-                className="flex items-center gap-3 px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-xl"
-              >
-                <span className="text-white font-medium">{char.character}</span>
-                <div className="h-4 w-px bg-zinc-700" />
-                <span className="text-sm text-zinc-400">{char.winRate}% WR</span>
-                <span className="text-xs text-zinc-600">({char.setsPlayed} sets)</span>
-              </div>
-            ))}
+{/* Mains Section */}
+{player.characterStats && player.characterStats.length > 0 && (
+  <section className="mb-12">
+    <h2 className="font-[var(--font-bebas-neue)] text-2xl text-white tracking-wide mb-6">
+      Mains
+    </h2>
+    <div className="flex flex-wrap gap-3">
+      {player.characterStats.map((char) => (
+        <div
+          key={char.character}
+          className="flex items-center gap-3 px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-zinc-600 transition-colors"
+        >
+          {/* NUEVO: ícono del personaje */}
+          <CharacterIcon character={char.character} size={36} />
+
+          <div>
+            <span className="text-white font-medium block">{char.character}</span>
+            <span className="text-zinc-500 text-xs">{char.winRate}% WR · {char.setsPlayed} sets</span>
           </div>
-        </section>
-      )}
+        </div>
+      ))}
+    </div>
+  </section>
+)}
 
       {/* Tournament History */}
       <section className="mb-12">

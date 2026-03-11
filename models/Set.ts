@@ -8,11 +8,13 @@ const SetSchema = new mongoose.Schema({
     gamerTag: String,
     playerId: String,
     score: Number,
+    character: { type: String, default: '' },
   },
   player2: {
     gamerTag: String,
     playerId: String,
     score: Number,
+    character: { type: String, default: '' },
   },
   winnerId: String,
   displayScore: String,

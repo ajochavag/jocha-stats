@@ -1,5 +1,15 @@
 import mongoose from 'mongoose'
 
+const CharacterStatSchema = new mongoose.Schema(
+  {
+    character: { type: String, required: true },
+    setsPlayed: { type: Number, default: 0 },
+    setsWon: { type: Number, default: 0 },
+    winRate: { type: Number, default: 0 },
+  },
+  { _id: false }
+)
+
 const PlayerSchema = new mongoose.Schema({
   gamerTag: { type: String, required: true },
   startggUserId: { type: String },
@@ -15,6 +25,7 @@ const PlayerSchema = new mongoose.Schema({
     bestPlacement: { type: Number, default: 999 },
     tournamentsAttended: { type: Number, default: 0 },
   },
+  characterStats: { type: [CharacterStatSchema], default: [] },
   updatedAt: { type: Date, default: Date.now },
 })
 

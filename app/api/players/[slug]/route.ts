@@ -25,8 +25,8 @@ interface TournamentDoc {
 
 interface SetDoc {
   tournamentSlug: string
-  player1: { gamerTag: string; score: number }
-  player2: { gamerTag: string; score: number }
+  player1: { gamerTag: string; score: number; character?: string }
+  player2: { gamerTag: string; score: number; character?: string }
   winnerId: string
   date: Date
 }
@@ -62,11 +62,26 @@ export async function GET(
 
     const tag = playerDoc.gamerTag as string
 
+    const characterStats = (
+      (playerDoc.characterStats as Array<{
+        character: string
+        setsPlayed: number
+        setsWon: number
+        winRate: number
+      }>) || []
+    ).map((c) => ({
+      character: c.character,
+      winRate: c.winRate,
+      setsPlayed: c.setsPlayed,
+    }))
+
+    const secondaryMains = characterStats.slice(1).map((c) => c.character)
+
     const player = {
       tag,
       slug: playerDoc.slug,
       main: playerDoc.main || '',
-      secondaryMains: [] as string[],
+      secondaryMains,
       tournamentsAttended: stats.tournamentsAttended,
       bestPlacement: stats.bestPlacement,
       totalPoints: (playerDoc.totalPoints as number) || 0,
@@ -74,23 +89,23 @@ export async function GET(
       setsLost: stats.setsLost,
       winRate: stats.winRate,
       currentStreak: stats.currentStreak,
-      characterStats: [] as { character: string; winRate: number; setsPlayed: number }[],
+      characterStats,
     }
 
-    // Ranking: count players with more points
+    // Ranking: cuántos jugadores tienen más puntos
     const rank =
       (await PlayerModel.countDocuments({
         totalPoints: { $gt: playerDoc.totalPoints },
       })) + 1
 
-    // Tournament history
-    const allTournaments = (await TournamentModel.find({}).sort({ number: 1 }).lean()) as unknown as TournamentDoc[]
+    // Historial de torneos
+    const allTournaments = (await TournamentModel.find({})
+      .sort({ number: 1 })
+      .lean()) as unknown as TournamentDoc[]
 
     const tournamentHistory = allTournaments
       .map((t) => {
-        const standing = t.standings?.find(
-          (s) => s.gamerTag === tag
-        )
+        const standing = t.standings?.find((s) => s.gamerTag === tag)
         if (!standing) return null
 
         return {
@@ -120,7 +135,16 @@ export async function GET(
       .sort({ date: 1 })
       .lean()) as unknown as SetDoc[]
 
-    const h2hMap: Record<string, { wins: number; losses: number; lastPlayed: string }> = {}
+    const h2hMap: Record<
+      string,
+      {
+        wins: number
+        losses: number
+        lastPlayed: string
+        myCharacters: Record<string, number>
+        theirCharacters: Record<string, number>
+      }
+    > = {}
 
     for (const set of playerSets) {
       const isP1 = set.player1?.gamerTag === tag
@@ -128,7 +152,13 @@ export async function GET(
       if (!opponent) continue
 
       if (!h2hMap[opponent]) {
-        h2hMap[opponent] = { wins: 0, losses: 0, lastPlayed: '' }
+        h2hMap[opponent] = {
+          wins: 0,
+          losses: 0,
+          lastPlayed: '',
+          myCharacters: {},
+          theirCharacters: {},
+        }
       }
 
       if (set.winnerId === tag) {
@@ -138,9 +168,22 @@ export async function GET(
       }
 
       const dateStr = set.date
-        ? (set.date as Date).toISOString().split('T')[0]
+        ? (set.date as unknown as Date).toISOString().split('T')[0]
         : ''
       if (dateStr) h2hMap[opponent].lastPlayed = dateStr
+
+      // Registrar personajes usados en el matchup
+      const myChar = isP1 ? set.player1?.character : set.player2?.character
+      const theirChar = isP1 ? set.player2?.character : set.player1?.character
+
+      if (myChar) {
+        h2hMap[opponent].myCharacters[myChar] =
+          (h2hMap[opponent].myCharacters[myChar] || 0) + 1
+      }
+      if (theirChar) {
+        h2hMap[opponent].theirCharacters[theirChar] =
+          (h2hMap[opponent].theirCharacters[theirChar] || 0) + 1
+      }
     }
 
     const headToHead = Object.entries(h2hMap).map(([opponent, data]) => ({
@@ -152,6 +195,12 @@ export async function GET(
           ? Math.round((data.wins / (data.wins + data.losses)) * 100)
           : 0,
       lastPlayed: data.lastPlayed,
+      // Personaje más usado por el jugador vs este rival
+      myMostUsed:
+        Object.entries(data.myCharacters).sort((a, b) => b[1] - a[1])[0]?.[0] || '',
+      // Personaje más usado por el rival
+      theirMostUsed:
+        Object.entries(data.theirCharacters).sort((a, b) => b[1] - a[1])[0]?.[0] || '',
     }))
 
     return NextResponse.json({

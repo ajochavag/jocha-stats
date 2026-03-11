@@ -27,11 +27,29 @@ export async function GET() {
         tournamentsAttended: 0,
       }
 
+      const characterStats = (
+        (p.characterStats as Array<{
+          character: string
+          setsPlayed: number
+          setsWon: number
+          winRate: number
+        }>) || []
+      ).map((c) => ({
+        character: c.character,
+        winRate: c.winRate,
+        setsPlayed: c.setsPlayed,
+      }))
+
+      // Mains secundarios: todos los personajes excepto el principal
+      const secondaryMains = characterStats
+        .slice(1)
+        .map((c) => c.character)
+
       return {
         tag: p.gamerTag,
         slug: p.slug,
         main: p.main || '',
-        secondaryMains: [] as string[],
+        secondaryMains,
         tournamentsAttended: stats.tournamentsAttended,
         bestPlacement: stats.bestPlacement,
         totalPoints: p.totalPoints || 0,
@@ -39,7 +57,7 @@ export async function GET() {
         setsLost: stats.setsLost,
         winRate: stats.winRate,
         currentStreak: stats.currentStreak,
-        characterStats: [] as { character: string; winRate: number; setsPlayed: number }[],
+        characterStats,
       }
     })
 

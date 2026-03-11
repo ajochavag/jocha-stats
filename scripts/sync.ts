@@ -1,5 +1,5 @@
 import { connectDB } from '../lib/mongodb'
-import { fetchTournament, fetchStandings, fetchSets } from '../lib/startgg'
+import { fetchTournament, fetchStandings, fetchSets, SetData } from '../lib/startgg'
 import TournamentModel from '../models/Tournament'
 import PlayerModel from '../models/Player'
 import SetModel from '../models/Set'
@@ -16,6 +16,47 @@ function getPoints(placement: number): number {
 
 function toSlug(tag: string): string {
   return tag.toLowerCase().replace(/\s+/g, '-')
+}
+
+/**
+ * Extrae el personaje más usado por cada entrant en los games de un set.
+ * start.gg guarda las selections de personaje en Set.games[].selections[],
+ * donde cada selection tiene selectionType === 'CHARACTER' y el id del entrant.
+ * Retorna un mapa de entrantId -> nombre del personaje más seleccionado.
+ */
+function getCharactersFromGames(
+  set: SetData
+): Record<number, string> {
+  const charCount: Record<number, Record<string, number>> = {}
+
+  if (!set.games) return {}
+
+  for (const game of set.games) {
+    if (!game.selections) continue
+    for (const sel of game.selections) {
+      if (
+        sel.selectionType !== 'CHARACTER' ||
+        !sel.character ||
+        !sel.entrant
+      ) continue
+
+      const entrantId = sel.entrant.id
+      const charName = sel.character.name
+
+      if (!charCount[entrantId]) charCount[entrantId] = {}
+      charCount[entrantId][charName] = (charCount[entrantId][charName] || 0) + 1
+    }
+  }
+
+  // Para cada entrant, tomar el personaje más frecuente
+  const result: Record<number, string> = {}
+  for (const [entrantIdStr, chars] of Object.entries(charCount)) {
+    const entrantId = Number(entrantIdStr)
+    const mostUsed = Object.entries(chars).sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
+    result[entrantId] = mostUsed
+  }
+
+  return result
 }
 
 async function syncTournament(slug: string, number: number): Promise<boolean> {
@@ -49,6 +90,7 @@ async function syncTournament(slug: string, number: number): Promise<boolean> {
       placement: s.placement,
       gamerTag,
       playerId: userId,
+      userSlug,
       setsWon: 0,
       setsLost: 0,
       points: getPoints(s.placement),
@@ -116,6 +158,7 @@ async function syncTournament(slug: string, number: number): Promise<boolean> {
           slug: playerSlug,
           main: '',
           totalPoints: 0,
+          characterStats: [],
           stats: {
             setsWon: 0,
             setsLost: 0,
@@ -136,7 +179,7 @@ async function syncTournament(slug: string, number: number): Promise<boolean> {
     )
   }
 
-  // Upsert sets
+  // Upsert sets — ahora incluyendo personajes
   const tournamentDate = new Date(tournament.startAt * 1000)
   for (const set of sets) {
     if (!set.slots || set.slots.length < 2) continue
@@ -152,6 +195,11 @@ async function syncTournament(slug: string, number: number): Promise<boolean> {
     const isP1Winner = slot1.entrant.id === set.winnerId
     const winnerTag = isP1Winner ? p1Tag : p2Tag
 
+    // Extraer personajes seleccionados desde set.games[].selections[]
+    const charsByEntrant = getCharactersFromGames(set)
+    const p1Character = charsByEntrant[slot1.entrant.id] || ''
+    const p2Character = charsByEntrant[slot2.entrant.id] || ''
+
     await SetModel.findOneAndUpdate(
       { startggSetId: set.id.toString() },
       {
@@ -162,11 +210,13 @@ async function syncTournament(slug: string, number: number): Promise<boolean> {
           gamerTag: p1Tag,
           playerId: slot1.entrant.id.toString(),
           score: p1Score,
+          character: p1Character,
         },
         player2: {
           gamerTag: p2Tag,
           playerId: slot2.entrant.id.toString(),
           score: p2Score,
+          character: p2Character,
         },
         winnerId: winnerTag,
         displayScore: set.displayScore || `${p1Tag} ${p1Score} - ${p2Score} ${p2Tag}`,
@@ -211,11 +261,11 @@ async function recalculatePlayerStats() {
       }
     }
 
-    for (const set of allSets) {
-      const isP1 = set.player1?.gamerTag === tag
-      const isP2 = set.player2?.gamerTag === tag
-      if (!isP1 && !isP2) continue
+    const playerSets = allSets.filter(
+      (s) => s.player1?.gamerTag === tag || s.player2?.gamerTag === tag
+    )
 
+    for (const set of playerSets) {
       if (set.winnerId === tag) {
         setsWon++
       } else {
@@ -226,11 +276,8 @@ async function recalculatePlayerStats() {
     const totalSets = setsWon + setsLost
     const winRate = totalSets > 0 ? Math.round((setsWon / totalSets) * 1000) / 10 : 0
 
-    // Current streak: count consecutive wins from most recent set backwards
+    // Current streak: contar victorias consecutivas desde el set más reciente
     let currentStreak = 0
-    const playerSets = allSets.filter(
-      (s) => s.player1?.gamerTag === tag || s.player2?.gamerTag === tag
-    )
     for (let i = playerSets.length - 1; i >= 0; i--) {
       if (playerSets[i].winnerId === tag) {
         currentStreak++
@@ -239,10 +286,43 @@ async function recalculatePlayerStats() {
       }
     }
 
+    // --- Character stats ---
+    const charMap: Record<string, { won: number; played: number }> = {}
+
+    for (const set of playerSets) {
+      const isP1 = set.player1?.gamerTag === tag
+      const character: string = isP1
+        ? (set.player1?.character ?? '')
+        : (set.player2?.character ?? '')
+
+      if (!character) continue
+
+      if (!charMap[character]) charMap[character] = { won: 0, played: 0 }
+      charMap[character].played++
+      if (set.winnerId === tag) charMap[character].won++
+    }
+
+    const characterStats = Object.entries(charMap)
+      .map(([character, data]) => ({
+        character,
+        setsPlayed: data.played,
+        setsWon: data.won,
+        winRate:
+          data.played > 0
+            ? Math.round((data.won / data.played) * 1000) / 10
+            : 0,
+      }))
+      .sort((a, b) => b.setsPlayed - a.setsPlayed)
+
+    // Main = personaje más jugado
+    const mainChar = characterStats[0]?.character || ''
+
     await PlayerModel.findOneAndUpdate(
       { slug: player.slug },
       {
         totalPoints,
+        main: mainChar,
+        characterStats,
         stats: {
           setsWon,
           setsLost,
@@ -256,7 +336,7 @@ async function recalculatePlayerStats() {
     )
   }
 
-  console.log(`[sync] Recalculated stats for ${allPlayers.length} players`)
+  console.log('[sync] Player stats recalculated.')
 }
 
 export async function runSync(): Promise<{ tournaments: number; duration: number }> {
@@ -270,6 +350,7 @@ export async function runSync(): Promise<{ tournaments: number; duration: number
   let synced = 0
 
   if (autoDetect) {
+    // Auto-detección: intenta slugs consecutivos hasta que uno no exista
     let n = 1
     while (true) {
       const slug = `smash-bong-z-${n}`
@@ -278,6 +359,7 @@ export async function runSync(): Promise<{ tournaments: number; duration: number
         if (!found) break
         synced++
         n++
+        await new Promise((r) => setTimeout(r, 2000))
       } catch (err) {
         console.log(`[sync] Stopping auto-detect at ${slug}: ${err}`)
         break
@@ -292,6 +374,7 @@ export async function runSync(): Promise<{ tournaments: number; duration: number
       } catch (err) {
         console.error(`[sync] Error syncing ${slug}:`, err)
       }
+      if (n < totalTournaments) await new Promise((r) => setTimeout(r, 2000))
     }
   }
 
@@ -300,4 +383,26 @@ export async function runSync(): Promise<{ tournaments: number; duration: number
   const duration = Date.now() - start
   console.log(`[sync] Complete: ${synced} tournaments in ${duration}ms`)
   return { tournaments: synced, duration }
+}
+
+/**
+ * Sincroniza un único torneo por su slug y número,
+ * luego recalcula stats de todos los jugadores.
+ */
+export async function syncSingleTournament(
+  slug: string,
+  number: number
+): Promise<{ success: boolean; duration: number }> {
+  const start = Date.now()
+  await connectDB()
+
+  const success = await syncTournament(slug, number)
+
+  if (success) {
+    await recalculatePlayerStats()
+  }
+
+  const duration = Date.now() - start
+  console.log(`[sync] Single sync ${slug}: ${success ? 'OK' : 'NOT FOUND'} in ${duration}ms`)
+  return { success, duration }
 }

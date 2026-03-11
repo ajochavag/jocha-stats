@@ -42,18 +42,33 @@ async function getPlayersData(): Promise<Player[]> {
   }
 }
 
+async function getStats(): Promise<{
+  totalTournaments: number
+  totalPlayers: number
+  totalSets: number
+  lastChampion: string
+}> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/stats`, {
+      cache: 'no-store',
+    })
+    if (!res.ok) return { totalTournaments: 0, totalPlayers: 0, totalSets: 0, lastChampion: '' }
+    return res.json()
+  } catch {
+    return { totalTournaments: 0, totalPlayers: 0, totalSets: 0, lastChampion: '' }
+  }
+}
+
 export default async function HomePage() {
-  const [tournaments, rankings, players] = await Promise.all([
+  const [tournaments, rankings, players, stats] = await Promise.all([
     getTournaments(),
     getRankingsData(),
     getPlayersData(),
+    getStats(),
   ])
 
   const recentTournaments = [...tournaments].reverse().slice(0, 3)
-  const lastTournament = tournaments[tournaments.length - 1]
-  const lastChampion = lastTournament?.results?.find((r) => r.placement === 1)?.playerTag || ''
   const topPlayers = rankings.slice(0, 5)
-  const totalSets = tournaments.reduce((acc, t) => acc + (t.sets?.length || 0), 0)
 
   return (
     <div className="animate-in fade-in duration-500">
@@ -72,7 +87,8 @@ export default async function HomePage() {
               <span className="text-[#CC1F1F]">SUMMIT</span>
             </h1>
             <p className="text-lg md:text-xl text-zinc-400 max-w-2xl mx-auto mb-8">
-              El circuito de Smash Bros más competitivo. Donde los mejores jugadores luchan por la gloria.
+              El circuito de Smash Bros más competitivo.
+              Donde los mejores jugadores luchan por la gloria.
             </p>
             <Link
               href="/torneos"
@@ -94,7 +110,7 @@ export default async function HomePage() {
                 <Trophy size={24} />
               </div>
               <div className="font-[var(--font-bebas-neue)] text-3xl md:text-4xl text-white tracking-wide">
-                <AnimatedCounter end={tournaments.length} />
+                <AnimatedCounter end={stats.totalTournaments} />
               </div>
               <p className="text-sm text-zinc-500 mt-1">Total Torneos</p>
             </div>
@@ -104,7 +120,7 @@ export default async function HomePage() {
                 <Users size={24} />
               </div>
               <div className="font-[var(--font-bebas-neue)] text-3xl md:text-4xl text-white tracking-wide">
-                <AnimatedCounter end={players.length} />
+                <AnimatedCounter end={stats.totalPlayers} />
               </div>
               <p className="text-sm text-zinc-500 mt-1">Jugadores Registrados</p>
             </div>
@@ -114,7 +130,7 @@ export default async function HomePage() {
                 <Gamepad2 size={24} />
               </div>
               <div className="font-[var(--font-bebas-neue)] text-3xl md:text-4xl text-white tracking-wide">
-                <AnimatedCounter end={totalSets} />
+                <AnimatedCounter end={stats.totalSets} />
               </div>
               <p className="text-sm text-zinc-500 mt-1">Sets Jugados</p>
             </div>
@@ -124,7 +140,7 @@ export default async function HomePage() {
                 <Crown size={24} />
               </div>
               <div className="font-[var(--font-bebas-neue)] text-3xl md:text-4xl text-white tracking-wide">
-                {lastChampion}
+                {stats.lastChampion}
               </div>
               <p className="text-sm text-zinc-500 mt-1">Último Campeón</p>
             </div>
@@ -157,59 +173,58 @@ export default async function HomePage() {
       <section className="container mx-auto px-4 pb-16">
         <div className="flex items-center justify-between mb-8">
           <h2 className="font-[var(--font-bebas-neue)] text-3xl md:text-4xl text-white tracking-wide">
-            Top 5 Rankings
+            Top Rankings
           </h2>
           <Link
             href="/rankings"
             className="text-sm text-[#CC1F1F] hover:text-[#CC1F1F]/80 flex items-center gap-1"
           >
-            Ver rankings completos
+            Ver ranking completo
             <ArrowRight size={16} />
           </Link>
         </div>
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-zinc-800 text-left">
-                  <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Rank</th>
-                  <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Jugador</th>
-                  <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Puntos</th>
-                  <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden md:table-cell">Win Rate</th>
-                  <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden md:table-cell">Main</th>
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-zinc-800 text-left">
+                <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">#</th>
+                <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Jugador</th>
+                <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden md:table-cell">Main</th>
+                <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider text-right">Puntos</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topPlayers.map((player, index) => (
+                <tr
+                  key={player.slug}
+                  className="border-b border-zinc-800 last:border-0 hover:bg-zinc-800/50 transition-colors"
+                >
+                  <td className="px-4 py-4">
+                    <span className={`inline-flex items-center justify-center w-7 h-7 rounded text-sm font-bold ${
+                      index === 0 ? 'bg-[#FFD700]/20 text-[#FFD700]' :
+                      index === 1 ? 'bg-[#C0C0C0]/20 text-[#C0C0C0]' :
+                      index === 2 ? 'bg-[#CD7F32]/20 text-[#CD7F32]' :
+                      'bg-zinc-800 text-zinc-400'
+                    }`}>
+                      {index + 1}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4">
+                    <Link
+                      href={`/jugadores/${player.slug}`}
+                      className="text-white font-medium hover:text-[#CC1F1F] transition-colors"
+                    >
+                      {player.tag}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-4 text-zinc-400 hidden md:table-cell">{player.main || '—'}</td>
+                  <td className="px-4 py-4 text-right">
+                    <span className="text-white font-semibold">{player.totalPoints}</span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {topPlayers.map((player, index) => (
-                  <tr
-                    key={player.slug}
-                    className="border-b border-zinc-800 last:border-0 hover:bg-zinc-800/50 transition-colors group"
-                  >
-                    <td className="px-4 py-4">
-                      <span className={`font-bold ${
-                        index === 0 ? 'text-[#FFD700]' :
-                        index === 1 ? 'text-[#C0C0C0]' :
-                        index === 2 ? 'text-[#CD7F32]' : 'text-zinc-400'
-                      }`}>
-                        #{index + 1}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4">
-                      <Link
-                        href={`/jugadores/${player.slug}`}
-                        className="text-white font-medium hover:text-[#CC1F1F] transition-colors"
-                      >
-                        {player.tag}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-4 text-white font-semibold">{player.totalPoints}</td>
-                    <td className="px-4 py-4 hidden md:table-cell text-zinc-400">{player.winRate}%</td>
-                    <td className="px-4 py-4 hidden md:table-cell text-zinc-400">{player.main}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
     </div>

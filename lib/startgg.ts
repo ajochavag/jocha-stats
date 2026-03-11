@@ -63,6 +63,13 @@ export interface SetData {
     } | null
     standing: { stats: { score: { value: number } } } | null
   }[]
+  games?: {
+    selections?: {
+      selectionType: string
+      entrant: { id: number } | null
+      character: { id: number; name: string } | null
+    }[]
+  }[]
 }
 
 // --- Queries ---
@@ -112,7 +119,7 @@ const SETS_QUERY = `
     event(id: $eventId) {
       sets(
         page: $page
-        perPage: 50
+        perPage: 20
         filters: { state: 3 }
       ) {
         pageInfo {
@@ -130,6 +137,13 @@ const SETS_QUERY = `
               participants { gamerTag }
             }
             standing { stats { score { value } } }
+          }
+          games {
+            selections {
+              selectionType
+              entrant { id }
+              character { id name }
+            }
           }
         }
       }
