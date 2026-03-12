@@ -83,11 +83,9 @@ export default async function HomePage() {
         <div className="relative container mx-auto px-4 py-20 md:py-32">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="font-[var(--font-bebas-neue)] text-5xl md:text-7xl lg:text-8xl text-white tracking-wider mb-6">
-              <span className="block">STATS</span>
-              <span className="text-[#CC1F1F]">BONG</span>
+              <span className="block">STATS BONG</span>
             </h1>
             <p className="text-lg md:text-xl text-zinc-400 max-w-2xl mx-auto mb-8">
-              
               
               Adictos al Melee
             </p>
@@ -171,7 +169,7 @@ export default async function HomePage() {
       </section>
 
       {/* Top 5 Rankings Preview */}
-      <section className="container mx-auto px-4 pb-16">
+      {/* <section className="container mx-auto px-4 pb-16">
         <div className="flex items-center justify-between mb-8">
           <h2 className="font-[var(--font-bebas-neue)] text-3xl md:text-4xl text-white tracking-wide">
             Top Rankings
@@ -227,7 +225,7 @@ export default async function HomePage() {
             </tbody>
           </table>
         </div>
-      </section>
+      </section> */}
     </div>
   )
 }

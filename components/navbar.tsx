@@ -9,7 +9,7 @@ import { useState } from 'react'
 const navLinks = [
   { href: '/torneos', label: 'Torneos' },
   { href: '/jugadores', label: 'Jugadores' },
-  { href: '/rankings', label: 'Rankings' },
+  // { href: '/rankings', label: 'Rankings' },
 ]
 
 export function Navbar() {
