@@ -20,7 +20,10 @@ function getPlacementColor(placement: number) {
 }
 
 export function TournamentCard({ tournament }: TournamentCardProps) {
-  const top3 = tournament.results.filter(r => r.placement <= 3).sort((a, b) => a.placement - b.placement)
+  // ✅ Defensive check — results puede llegar null/undefined
+  const top3 = (tournament.results ?? [])
+    .filter(r => r.placement <= 3)
+    .sort((a, b) => a.placement - b.placement)
 
   return (
     <Link href={`/torneos/${tournament.slug}`}>
@@ -53,7 +56,7 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
         <div className="flex items-end gap-3 pt-3 border-t border-zinc-800">
           <Trophy size={16} className="text-zinc-600 mb-0.5" />
           <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {top3.map((result, index) => (
+            {top3.map((result) => (
               <div key={result.playerTag} className="flex items-center gap-1.5">
                 <span className={`text-xs font-bold ${getPlacementColor(result.placement)}`}>
                   {result.placement === 1 ? '1st' : result.placement === 2 ? '2nd' : '3rd'}

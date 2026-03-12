@@ -29,6 +29,7 @@ interface SetDoc {
   player2: { gamerTag: string; score: number; character?: string }
   winnerId: string
   date: Date
+  games?: { gameNum: number; character1: string; character2: string }[]
 }
 
 export async function GET(
@@ -92,7 +93,7 @@ export async function GET(
       characterStats,
     }
 
-    // Ranking: cuántos jugadores tienen más puntos
+    // Ranking
     const rank =
       (await PlayerModel.countDocuments({
         totalPoints: { $gt: playerDoc.totalPoints },
@@ -107,7 +108,6 @@ export async function GET(
       .map((t) => {
         const standing = t.standings?.find((s) => s.gamerTag === tag)
         if (!standing) return null
-
         return {
           tournament: {
             id: t.number,
@@ -128,13 +128,14 @@ export async function GET(
       })
       .filter(Boolean)
 
-    // Head-to-head
+    // Sets del jugador
     const playerSets = (await SetModel.find({
       $or: [{ 'player1.gamerTag': tag }, { 'player2.gamerTag': tag }],
     })
       .sort({ date: 1 })
       .lean()) as unknown as SetDoc[]
 
+    // Head-to-head
     const h2hMap: Record<
       string,
       {
@@ -172,7 +173,6 @@ export async function GET(
         : ''
       if (dateStr) h2hMap[opponent].lastPlayed = dateStr
 
-      // Registrar personajes usados en el matchup
       const myChar = isP1 ? set.player1?.character : set.player2?.character
       const theirChar = isP1 ? set.player2?.character : set.player1?.character
 
@@ -195,12 +195,24 @@ export async function GET(
           ? Math.round((data.wins / (data.wins + data.losses)) * 100)
           : 0,
       lastPlayed: data.lastPlayed,
-      // Personaje más usado por el jugador vs este rival
       myMostUsed:
         Object.entries(data.myCharacters).sort((a, b) => b[1] - a[1])[0]?.[0] || '',
-      // Personaje más usado por el rival
       theirMostUsed:
         Object.entries(data.theirCharacters).sort((a, b) => b[1] - a[1])[0]?.[0] || '',
+    }))
+
+    // Sets formateados para matchups en la page
+    const sets = playerSets.map((s) => ({
+      player1: s.player1?.gamerTag || '',
+      player2: s.player2?.gamerTag || '',
+      winner: s.winnerId || '',
+      character1: s.player1?.character || '',
+      character2: s.player2?.character || '',
+      games: (s.games || []).map((g) => ({
+        gameNum: g.gameNum,
+        character1: g.character1 || '',
+        character2: g.character2 || '',
+      })),
     }))
 
     return NextResponse.json({
@@ -208,6 +220,7 @@ export async function GET(
       rank,
       tournamentHistory,
       headToHead,
+      sets,
     })
   } catch (error) {
     console.error('[api/players/slug] Error:', error)

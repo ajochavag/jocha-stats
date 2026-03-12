@@ -20,9 +20,6 @@ function toSlug(tag: string): string {
 
 /**
  * Extrae el personaje más usado por cada entrant en los games de un set.
- * start.gg guarda las selections de personaje en Set.games[].selections[],
- * donde cada selection tiene selectionType === 'CHARACTER' y el id del entrant.
- * Retorna un mapa de entrantId -> nombre del personaje más seleccionado.
  */
 function getCharactersFromGames(
   set: SetData
@@ -48,7 +45,6 @@ function getCharactersFromGames(
     }
   }
 
-  // Para cada entrant, tomar el personaje más frecuente
   const result: Record<number, string> = {}
   for (const [entrantIdStr, chars] of Object.entries(charCount)) {
     const entrantId = Number(entrantIdStr)
@@ -57,6 +53,35 @@ function getCharactersFromGames(
   }
 
   return result
+}
+
+/**
+ * Extrae los personajes por game para cada jugador.
+ * Retorna array de { gameNum, character1, character2 } donde
+ * character1 = personaje del slot1 (p1) y character2 = personaje del slot2 (p2).
+ */
+function getGamesData(
+  set: SetData,
+  p1EntrantId: number,
+  p2EntrantId: number
+): { gameNum: number; winnerId: string; character1: string; character2: string }[] {
+  if (!set.games) return []
+
+  return set.games.map((game, i) => {
+    const p1Sel = game.selections?.find(
+      (s) => s.entrant?.id === p1EntrantId && s.selectionType === 'CHARACTER'
+    )
+    const p2Sel = game.selections?.find(
+      (s) => s.entrant?.id === p2EntrantId && s.selectionType === 'CHARACTER'
+    )
+
+    return {
+      gameNum: i + 1,
+      winnerId: '',
+      character1: p1Sel?.character?.name || '',
+      character2: p2Sel?.character?.name || '',
+    }
+  })
 }
 
 async function syncTournament(slug: string, number: number): Promise<boolean> {
@@ -179,7 +204,7 @@ async function syncTournament(slug: string, number: number): Promise<boolean> {
     )
   }
 
-  // Upsert sets — ahora incluyendo personajes
+  // Upsert sets con personajes y games
   const tournamentDate = new Date(tournament.startAt * 1000)
   for (const set of sets) {
     if (!set.slots || set.slots.length < 2) continue
@@ -195,10 +220,13 @@ async function syncTournament(slug: string, number: number): Promise<boolean> {
     const isP1Winner = slot1.entrant.id === set.winnerId
     const winnerTag = isP1Winner ? p1Tag : p2Tag
 
-    // Extraer personajes seleccionados desde set.games[].selections[]
+    // Personaje más usado en el set (para el campo legacy character)
     const charsByEntrant = getCharactersFromGames(set)
     const p1Character = charsByEntrant[slot1.entrant.id] || ''
     const p2Character = charsByEntrant[slot2.entrant.id] || ''
+
+    // Personajes por game individual
+    const gamesData = getGamesData(set, slot1.entrant.id, slot2.entrant.id)
 
     await SetModel.findOneAndUpdate(
       { startggSetId: set.id.toString() },
@@ -221,6 +249,7 @@ async function syncTournament(slug: string, number: number): Promise<boolean> {
         winnerId: winnerTag,
         displayScore: set.displayScore || `${p1Tag} ${p1Score} - ${p2Score} ${p2Tag}`,
         date: tournamentDate,
+        games: gamesData,
       },
       { upsert: true }
     )
@@ -276,7 +305,6 @@ async function recalculatePlayerStats() {
     const totalSets = setsWon + setsLost
     const winRate = totalSets > 0 ? Math.round((setsWon / totalSets) * 1000) / 10 : 0
 
-    // Current streak: contar victorias consecutivas desde el set más reciente
     let currentStreak = 0
     for (let i = playerSets.length - 1; i >= 0; i--) {
       if (playerSets[i].winnerId === tag) {
@@ -286,20 +314,37 @@ async function recalculatePlayerStats() {
       }
     }
 
-    // --- Character stats ---
+    // Character stats — usando games individuales si están disponibles
     const charMap: Record<string, { won: number; played: number }> = {}
 
     for (const set of playerSets) {
       const isP1 = set.player1?.gamerTag === tag
-      const character: string = isP1
-        ? (set.player1?.character ?? '')
-        : (set.player2?.character ?? '')
+      const wonSet = set.winnerId === tag
 
-      if (!character) continue
+      // Si hay games individuales, usarlos
+      if (set.games && set.games.length > 0) {
+        for (const game of set.games) {
+          const character: string = isP1
+            ? (game.character1 || '')
+            : (game.character2 || '')
 
-      if (!charMap[character]) charMap[character] = { won: 0, played: 0 }
-      charMap[character].played++
-      if (set.winnerId === tag) charMap[character].won++
+          if (!character) continue
+          if (!charMap[character]) charMap[character] = { won: 0, played: 0 }
+          charMap[character].played++
+          // Para games individuales no tenemos winner por game, usamos winner del set
+          if (wonSet) charMap[character].won++
+        }
+      } else {
+        // Fallback al personaje del set
+        const character: string = isP1
+          ? (set.player1?.character ?? '')
+          : (set.player2?.character ?? '')
+
+        if (!character) continue
+        if (!charMap[character]) charMap[character] = { won: 0, played: 0 }
+        charMap[character].played++
+        if (wonSet) charMap[character].won++
+      }
     }
 
     const characterStats = Object.entries(charMap)
@@ -314,7 +359,6 @@ async function recalculatePlayerStats() {
       }))
       .sort((a, b) => b.setsPlayed - a.setsPlayed)
 
-    // Main = personaje más jugado
     const mainChar = characterStats[0]?.character || ''
 
     await PlayerModel.findOneAndUpdate(
@@ -350,7 +394,6 @@ export async function runSync(): Promise<{ tournaments: number; duration: number
   let synced = 0
 
   if (autoDetect) {
-    // Auto-detección: intenta slugs consecutivos hasta que uno no exista
     let n = 1
     while (true) {
       const slug = `smash-bong-z-${n}`
@@ -385,10 +428,6 @@ export async function runSync(): Promise<{ tournaments: number; duration: number
   return { tournaments: synced, duration }
 }
 
-/**
- * Sincroniza un único torneo por su slug y número,
- * luego recalcula stats de todos los jugadores.
- */
 export async function syncSingleTournament(
   slug: string,
   number: number
