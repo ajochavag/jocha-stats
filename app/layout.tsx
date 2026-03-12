@@ -17,7 +17,7 @@ const bebasNeue = Bebas_Neue({
 })
 
 export const metadata: Metadata = {
-  title: 'Smash Bong Summit',
+  title: 'Stats Bong',
   description: 'El circuito de Smash Bros más competitivo',
   generator: 'v0.app',
 }

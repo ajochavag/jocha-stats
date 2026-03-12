@@ -9,10 +9,10 @@ export function Footer() {
           <div className="flex flex-col items-center md:items-start gap-2">
             <Link href="/" className="flex items-center gap-2">
               <span className="font-[var(--font-bebas-neue)] text-xl font-bold tracking-wider text-white">
-                SMASH BONG
+                STATS
               </span>
               <span className="font-[var(--font-bebas-neue)] text-xl font-bold tracking-wider text-[#CC1F1F]">
-                SUMMIT
+                BONG
               </span>
             </Link>
             <p className="text-sm text-zinc-500">
@@ -61,7 +61,7 @@ export function Footer() {
 
         <div className="mt-8 pt-6 border-t border-zinc-800 text-center">
           <p className="text-xs text-zinc-600">
-            © {new Date().getFullYear()} Smash Bong Summit. Todos los derechos reservados.
+            © {new Date().getFullYear()} Smash Bong. Todos los derechos reservados.
           </p>
         </div>
       </div>

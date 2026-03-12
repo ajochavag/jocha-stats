@@ -83,12 +83,13 @@ export default async function HomePage() {
         <div className="relative container mx-auto px-4 py-20 md:py-32">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="font-[var(--font-bebas-neue)] text-5xl md:text-7xl lg:text-8xl text-white tracking-wider mb-6">
-              <span className="block">SMASH BONG</span>
-              <span className="text-[#CC1F1F]">SUMMIT</span>
+              <span className="block">STATS</span>
+              <span className="text-[#CC1F1F]">BONG</span>
             </h1>
             <p className="text-lg md:text-xl text-zinc-400 max-w-2xl mx-auto mb-8">
-              El circuito de Smash Bros más competitivo.
-              Donde los mejores jugadores luchan por la gloria.
+              
+              
+              Adictos al Melee
             </p>
             <Link
               href="/torneos"

@@ -22,10 +22,10 @@ export function Navbar() {
         <Link href="/" className="flex items-center gap-2">
           <div className="relative">
             <span className="font-[var(--font-bebas-neue)] text-2xl md:text-3xl font-bold tracking-wider text-white">
-              SMASH BONG
+              STATS
             </span>
             <span className="font-[var(--font-bebas-neue)] text-2xl md:text-3xl font-bold tracking-wider text-[#CC1F1F] ml-2">
-              SUMMIT
+              BONG
             </span>
           </div>
         </Link>
